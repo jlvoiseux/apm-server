@@ -38,6 +38,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -136,7 +137,7 @@ func (b *apmMetricBuilder) build(ms metricsets) {
 
 	case "system.cpu.utilization":
 		activeProp := float64(0)
-		numberDp := float64(0)
+		numberCpus := 1
 		var bufferDp pdata.NumberDataPoint
 		for _, metric := range b.metricList {
 			dps := metric.Gauge().DataPoints()
@@ -144,7 +145,6 @@ func (b *apmMetricBuilder) build(ms metricsets) {
 				dp := dps.At(i)
 				bufferDp = dp
 				if sample, ok := numberSample(dp, model.MetricTypeCounter); ok {
-					numberDp += 1
 					dp.Attributes().Range(func(k string, v pdata.AttributeValue) bool {
 						if k == "state" && v.StringVal() != "idle" {
 							if sample.Value > 1 {
@@ -153,18 +153,24 @@ func (b *apmMetricBuilder) build(ms metricsets) {
 								activeProp += sample.Value
 							}
 						}
+						if k == "cpu" {
+							cpuId, _ := strconv.Atoi(v.StringVal())
+							if cpuId+1 > numberCpus {
+								numberCpus = cpuId + 1
+							}
+						}
 						return true
 					})
 				}
 			}
 		}
 		println("Computation in progress")
-		println(activeProp / numberDp)
+		println(activeProp / float64(numberCpus))
 		ms.upsertOne(
 			bufferDp.Timestamp().AsTime(),
 			"system.cpu.total.norm.pct",
 			pdata.NewAttributeMap(),
-			model.MetricsetSample{Type: model.MetricTypeCounter, Value: activeProp / numberDp},
+			model.MetricsetSample{Type: model.MetricTypeGauge, Value: activeProp / float64(numberCpus)},
 		)
 	}
 }
