@@ -18,6 +18,7 @@
 package api
 
 import (
+	"github.com/elastic/apm-server/beater/otlp"
 	"net"
 	"net/http"
 	httppprof "net/http/pprof"
@@ -74,6 +75,13 @@ const (
 	// FirehosePath defines the path to ingest firehose logs.
 	// This endpoint is experimental and subject to breaking changes and removal.
 	FirehosePath = "/firehose"
+
+	// OTLPTracesIntakePath defines the path to ingest OpenTelemetry traces (HTTP Collector)
+	OTLPTracesIntakePath = "/v1/traces"
+	// OTLPMetricsIntakePath defines the path to ingest OpenTelemetry metrics (HTTP Collector)
+	OTLPMetricsIntakePath = "/v1/metrics"
+	// OTLPLogsIntakePath defines the path to ingest OpenTelemetry logs (HTTP Collector)
+	OTLPLogsIntakePath = "/v1/logs"
 )
 
 // NewMux creates a new gorilla/mux router, with routes registered for handling the
@@ -149,6 +157,11 @@ func NewMux(
 		pprofRouter.Handle("/symbol", http.HandlerFunc(httppprof.Symbol))
 		pprofRouter.Handle("/trace", http.HandlerFunc(httppprof.Trace))
 	}
+	// OTLP intake endpoints are experimental and subject to breaking changes and removal.
+	if err := otlp.RegisterHTTPServices(router, batchProcessor, OTLPTracesIntakePath, OTLPMetricsIntakePath, OTLPLogsIntakePath); err != nil {
+		return nil, err
+	}
+	logger.Info("OTLP paths added to request handler")
 	return router, nil
 }
 
