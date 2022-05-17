@@ -119,6 +119,7 @@ func (c *Consumer) Capabilities() consumer.Capabilities {
 // ConsumeTraces consumes OpenTelemetry trace data,
 // converting into Elastic APM events and reporting to the Elastic APM schema.
 func (c *Consumer) ConsumeTraces(ctx context.Context, traces pdata.Traces) error {
+	fmt.Println("TRACES CONSUMED")
 	receiveTimestamp := time.Now()
 	logger := logp.NewLogger(logs.Otel)
 	if logger.IsDebug() {

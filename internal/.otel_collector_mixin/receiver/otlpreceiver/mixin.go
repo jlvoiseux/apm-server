@@ -16,7 +16,6 @@ package otlpreceiver
 
 import (
 	"context"
-	"github.com/gorilla/mux"
 	"go.opentelemetry.io/collector/component/componenterror"
 	"net/http"
 
@@ -51,11 +50,16 @@ var settings = component.ReceiverCreateSettings{
 	},
 }
 
+type HTTPReceivers struct {
+	TracesR  *trace.Receiver
+	MetricsR *metrics.Receiver
+	LogsR    *logs.Receiver
+}
+
 // GRPC Receivers
 
 // RegisterGRPCTraceReceiver registers the trace receiver with a gRPC server.
 func RegisterGRPCTraceReceiver(ctx context.Context, consumer consumer.Traces, serverGRPC *grpc.Server) error {
-
 	receiver := trace.New(config.NewComponentID("otlp"), consumer, settings)
 	otlpgrpc.RegisterTracesServer(serverGRPC, receiver)
 	return nil
@@ -77,62 +81,41 @@ func RegisterGRPCLogsReceiver(ctx context.Context, consumer consumer.Logs, serve
 
 // HTTP Receivers
 
-// RegisterHTTPTraceReceiver registers the trace receiver with an HTTP server
-func RegisterHTTPTraceReceiver(ctx context.Context, consumer consumer.Traces, httpMux *mux.Router, path string) error {
+func NewHTTPTraceReceiver(ctx context.Context, consumer consumer.Traces) (*trace.Receiver, error) {
 	receiver := trace.New(config.NewComponentID("otlp"), consumer, settings)
 	if consumer == nil {
-		return componenterror.ErrNilNextConsumer
+		return nil, componenterror.ErrNilNextConsumer
 	}
-	if httpMux != nil {
-		httpMux.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
-			handleTraces(resp, req, receiver, pbEncoder)
-		}).Methods(http.MethodPost).Headers("Content-Type", pbContentType)
-		httpMux.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
-			handleTraces(resp, req, receiver, jsEncoder)
-		}).Methods(http.MethodPost).Headers("Content-Type", jsonContentType)
-		httpMux.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
-			handleUnmatchedRequests(resp, req)
-		})
-	}
-	return nil
+
+	return receiver, nil
 }
 
-// RegisterHTTPMetricsReceiver registers the metrics receiver with an HTTP server
-func RegisterHTTPMetricsReceiver(ctx context.Context, consumer consumer.Metrics, httpMux *mux.Router, path string) error {
+func HandleHTTPTraces(resp http.ResponseWriter, req *http.Request, traceReceiver *trace.Receiver) {
+	handleTraces(resp, req, traceReceiver, pbEncoder)
+}
+
+func NewHTTPMetricsReceiver(ctx context.Context, consumer consumer.Metrics) (*metrics.Receiver, error) {
 	receiver := metrics.New(config.NewComponentID("otlp"), consumer, settings)
 	if consumer == nil {
-		return componenterror.ErrNilNextConsumer
+		return nil, componenterror.ErrNilNextConsumer
 	}
-	if httpMux != nil {
-		httpMux.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
-			handleMetrics(resp, req, receiver, pbEncoder)
-		}).Methods(http.MethodPost).Headers("Content-Type", pbContentType)
-		httpMux.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
-			handleMetrics(resp, req, receiver, jsEncoder)
-		}).Methods(http.MethodPost).Headers("Content-Type", jsonContentType)
-		httpMux.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
-			handleUnmatchedRequests(resp, req)
-		})
-	}
-	return nil
+
+	return receiver, nil
 }
 
-// RegisterHTTPLogsReceiver registers the logs receiver with an HTTP server
-func RegisterHTTPLogsReceiver(ctx context.Context, consumer consumer.Logs, httpMux *mux.Router, path string) error {
+func HandleHTTPMetrics(resp http.ResponseWriter, req *http.Request, metricsReceiver *metrics.Receiver) {
+	handleMetrics(resp, req, metricsReceiver, pbEncoder)
+}
+
+func NewHTTPLogsReceiver(ctx context.Context, consumer consumer.Logs) (*logs.Receiver, error) {
 	receiver := logs.New(config.NewComponentID("otlp"), consumer, settings)
 	if consumer == nil {
-		return componenterror.ErrNilNextConsumer
+		return nil, componenterror.ErrNilNextConsumer
 	}
-	if httpMux != nil {
-		httpMux.HandleFunc(path, func(w http.ResponseWriter, req *http.Request) {
-			handleLogs(w, req, receiver, pbEncoder)
-		}).Methods(http.MethodPost).Headers("Content-Type", pbContentType)
-		httpMux.HandleFunc(path, func(w http.ResponseWriter, req *http.Request) {
-			handleLogs(w, req, receiver, jsEncoder)
-		}).Methods(http.MethodPost).Headers("Content-Type", jsonContentType)
-		httpMux.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
-			handleUnmatchedRequests(resp, req)
-		})
-	}
-	return nil
+
+	return receiver, nil
+}
+
+func HandleHTTPLogs(resp http.ResponseWriter, req *http.Request, logsReceiver *logs.Receiver) {
+	handleLogs(resp, req, logsReceiver, pbEncoder)
 }
